@@ -61,7 +61,12 @@ func (app *application) RemoveServerHandler(w http.ResponseWriter, r *http.Reque
 	var serverStruct = struct {
 		Name string `json:"name"`
 	}{}
-	app.readJSON(w, r, &serverStruct)
+	err := app.readJSON(w, r, &serverStruct)
+	if err != nil {
+		app.errorResponse(w, r, http.StatusBadRequest, "Invalid JSON")
+		app.mutex.Unlock()
+		return
+	}
 	var servers []*data.Server
 	for i, server := range app.servers {
 		if server.Name != serverStruct.Name {
@@ -78,13 +83,17 @@ func (app *application) ListServersHandler(w http.ResponseWriter, r *http.Reques
 	app.logger.Info("Server list request received")
 	app.mutex.Lock()
 	w.Header().Set("Content-Type", "application/json")
-	data, err := json.Marshal(app.servers)
+	jsonData, err := json.Marshal(app.servers)
 	if err != nil {
 		w.WriteHeader(500)
 		app.mutex.Unlock()
 		return
 	}
-	w.WriteHeader(200)
-	w.Write(data)
 	app.mutex.Unlock()
+	w.WriteHeader(200)
+	_, err = w.Write(jsonData)
+	if err != nil {
+		app.logger.Error(err.Error())
+		return
+	}
 }
