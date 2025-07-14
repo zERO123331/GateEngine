@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type config struct {
 type application struct {
 	logger  *slog.Logger
 	config  *config
+	mutex   sync.Mutex
 	proxies []*data.Proxy
 	servers []*data.Server
 	client  *http.Client
@@ -24,6 +26,7 @@ type application struct {
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	client := &http.Client{}
+	var mu sync.Mutex
 
 	app := &application{
 		logger: logger,
@@ -34,6 +37,7 @@ func main() {
 			},
 			secret: "secret",
 		},
+		mutex:   mu,
 		proxies: []*data.Proxy{},
 		servers: []*data.Server{},
 		client:  client,
