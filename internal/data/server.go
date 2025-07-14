@@ -2,7 +2,6 @@ package data
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/Tnze/go-mc/bot"
 	"github.com/Tnze/go-mc/chat"
 	"github.com/google/uuid"
@@ -29,11 +28,6 @@ type status struct {
 
 type Icon string
 
-type Address struct {
-	IP   string
-	Port int
-}
-
 type Server struct {
 	Name        string  `json:"name"`
 	Address     Address `json:"address"`
@@ -44,7 +38,7 @@ type Server struct {
 }
 
 func (s *Server) UpdatePlayerCount() error {
-	response, _, err := bot.PingAndListTimeout(fmt.Sprintf("%s:%d", s.Address.IP, s.Address.Port), time.Second*5)
+	response, _, err := bot.PingAndListTimeout(s.Address.String(), time.Second*5)
 	if err != nil {
 		return err
 	}
@@ -65,7 +59,7 @@ func (s *Server) MarshalJSON() ([]byte, error) {
 		Fallback bool   `json:"fallback"`
 	}{
 		Name:     s.Name,
-		Address:  fmt.Sprintf("%s:%d", s.Address.IP, s.Address.Port),
+		Address:  s.Address.String(),
 		Fallback: s.Fallback,
 	}
 	return json.Marshal(aux)

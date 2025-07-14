@@ -9,8 +9,7 @@ import (
 )
 
 type config struct {
-	port    int
-	address string
+	address data.Address
 	secret  string
 }
 
@@ -29,9 +28,11 @@ func main() {
 	app := &application{
 		logger: logger,
 		config: &config{
-			port:    8080,
-			address: "127.0.0.1",
-			secret:  "secret",
+			address: data.Address{
+				IP:   "127.0.0.1",
+				Port: 8080,
+			},
+			secret: "secret",
 		},
 		proxies: []*data.Proxy{},
 		servers: []*data.Server{},
@@ -39,7 +40,7 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:         combineAddresses(app.config.address, app.config.port),
+		Addr:         app.config.address.String(),
 		Handler:      app.routes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,

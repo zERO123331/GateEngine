@@ -43,14 +43,15 @@ func (app *application) RemoveServerHandler(w http.ResponseWriter, r *http.Reque
 		Name string `json:"name"`
 	}{}
 	app.readJSON(w, r, &serverStruct)
+	var servers []*data.Server
 	for i, server := range app.servers {
 		if server.Name != serverStruct.Name {
-			app.servers = append(app.servers, app.servers[i])
-			break
+			servers = append(servers, app.servers[i])
 		}
 	}
+	app.servers = servers
 	app.logger.Info("Server removed", "Name", serverStruct.Name)
-
+	w.WriteHeader(200)
 }
 
 func (app *application) ListServersHandler(w http.ResponseWriter, r *http.Request) {

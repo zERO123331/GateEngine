@@ -70,7 +70,3 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 	}
 	return nil
 }
-
-func combineAddresses(ip string, port int) string {
-	return fmt.Sprintf("%s:%d", ip, port)
-}
