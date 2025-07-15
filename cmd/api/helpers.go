@@ -1,6 +1,8 @@
 package main
 
 import (
+	"GateEngine/internal/data"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,4 +71,28 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
+}
+
+func serverList(servers []*data.Server) (*bytes.Buffer, error) {
+	var serversStruct []struct {
+		Name     string `json:"name"`
+		Address  string `json:"address"`
+		Fallback bool   `json:"fallback"`
+	}
+	for _, s := range servers {
+		serversStruct = append(serversStruct, struct {
+			Name     string `json:"name"`
+			Address  string `json:"address"`
+			Fallback bool   `json:"fallback"`
+		}{
+			Name:     s.Name,
+			Address:  s.Address.String(),
+			Fallback: s.Fallback,
+		})
+	}
+	body, err := json.Marshal(serversStruct)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewBuffer(body), nil
 }

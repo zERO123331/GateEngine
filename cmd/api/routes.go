@@ -11,13 +11,13 @@ func (app *application) routes() http.Handler {
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
 
-	router.HandlerFunc(http.MethodPost, "/addserver", app.AddServerHandler)
-	router.HandlerFunc(http.MethodPost, "/removeserver", app.RemoveServerHandler)
-	router.HandlerFunc(http.MethodGet, "/listservers", app.ListServersHandler)
+	router.HandlerFunc(http.MethodPost, "/servers/add", app.AddServerHandler)
+	router.HandlerFunc(http.MethodPost, "/servers/remove", app.RemoveServerHandler)
+	router.HandlerFunc(http.MethodGet, "/servers/list", app.ListServersHandler)
 
-	router.HandlerFunc(http.MethodPost, "/addproxy", app.addProxyHandler)
-	router.HandlerFunc(http.MethodPost, "/removeproxy", app.removeProxyHandler)
-	router.HandlerFunc(http.MethodGet, "/listproxies", app.listProxyHandler)
+	router.HandlerFunc(http.MethodPost, "/proxies/add", app.addProxyHandler)
+	router.HandlerFunc(http.MethodPost, "/proxies/remove", app.removeProxyHandler)
+	router.HandlerFunc(http.MethodGet, "/proxies/list", app.listProxyHandler)
 
 	return app.checkToken(router)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"GateEngine/internal/data"
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -12,10 +13,12 @@ func (app *application) addProxyHandler(w http.ResponseWriter, r *http.Request) 
 	app.logger.Info("Proxy add request received")
 	app.mutex.Lock()
 	var proxyStruct = struct {
-		Name    string `json:"name"`
-		Address string `json:"address"`
-		Kind    string `json:"kind"`
-		Secret  string `json:"secret"`
+		Name       string `json:"name"`
+		Address    string `json:"address"`
+		Kind       string `json:"kind"`
+		ID         int    `json:"id"`
+		APIAddress string `json:"apiAddress"`
+		Secret     string `json:"secret"`
 	}{}
 	err := app.readJSON(w, r, &proxyStruct)
 	if err != nil {
@@ -25,6 +28,8 @@ func (app *application) addProxyHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	address := strings.Split(proxyStruct.Address, ":")
 	port, err := strconv.Atoi(address[1])
+	apiAddress := strings.Split(proxyStruct.APIAddress, ":")
+	apiPort, err := strconv.Atoi(apiAddress[1])
 	kind := strings.ToLower(proxyStruct.Kind)
 	if err != nil {
 		app.errorResponse(w, r, http.StatusBadRequest, "Invalid address")
@@ -38,7 +43,12 @@ func (app *application) addProxyHandler(w http.ResponseWriter, r *http.Request) 
 			IP:   address[0],
 			Port: port,
 		},
-		Kind:   kind,
+		Kind: kind,
+		ID:   proxyStruct.ID,
+		APIAddress: data.Address{
+			IP:   apiAddress[0],
+			Port: apiPort,
+		},
 		Secret: proxyStruct.Secret,
 	}
 
@@ -49,11 +59,13 @@ func (app *application) addProxyHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-
+	// Note if I want to store a list of Servers that are registered on a Proxy locally in its model, I need to execute SetupProxy() before appending it to the Proxy list
 	app.proxies = append(app.proxies, newProxy)
+	w.WriteHeader(200)
+	app.SetupProxy(*newProxy)
 	app.mutex.Unlock()
 	app.logger.Info("Proxy added", "Name", proxyStruct.Name)
-	w.WriteHeader(200)
+
 }
 
 func (app *application) removeProxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -97,5 +109,37 @@ func (app *application) listProxyHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		app.logger.Error(err.Error())
 		return
+	}
+}
+
+func (app *application) SetupProxy(p data.Proxy) {
+	url := "http://" + p.APIAddress.String() + "/servers/add"
+	var serversStruct []struct {
+		Name     string `json:"name"`
+		Address  string `json:"address"`
+		Fallback bool   `json:"fallback"`
+	}
+	for _, s := range app.servers {
+		serverStruct := struct {
+			Name     string `json:"name"`
+			Address  string `json:"address"`
+			Fallback bool   `json:"fallback"`
+		}{
+			Name:     s.Name,
+			Address:  s.Address.String(),
+			Fallback: s.Fallback,
+		}
+		serversStruct = append(serversStruct, serverStruct)
+	}
+	body, err := json.Marshal(serversStruct)
+	if err != nil {
+		app.logger.Error(err.Error())
+		return
+	}
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", p.Secret)
+	if err != nil {
+		app.logger.Error(err.Error())
 	}
 }

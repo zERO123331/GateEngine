@@ -2,10 +2,11 @@ package main
 
 import (
 	"GateEngine/internal/data"
+	"bytes"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
+	"strings"
 )
 
 func (app *application) AddServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -14,6 +15,7 @@ func (app *application) AddServerHandler(w http.ResponseWriter, r *http.Request)
 	var serverStruct = struct {
 		Name     string `json:"name"`
 		Address  string `json:"address"`
+		Kind     string `json:"kind"`
 		Fallback bool   `json:"fallback"`
 	}{}
 	err := app.readJSON(w, r, &serverStruct)
@@ -23,8 +25,7 @@ func (app *application) AddServerHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	reg := regexp.MustCompile("[0-9.]:[0-9]")
-	address := reg.Split(serverStruct.Address, 2)
+	address := strings.Split(serverStruct.Address, ":")
 	port, err := strconv.Atoi(address[1])
 	if err != nil {
 		app.errorResponse(w, r, http.StatusBadRequest, "Invalid address")
@@ -50,8 +51,15 @@ func (app *application) AddServerHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	app.servers = append(app.servers, newServer)
+	err = app.RegisterServer(*newServer)
+	if err != nil {
+		app.logger.Error(err.Error())
+		app.UnregisterServer(newServer.Name)
+		app.mutex.Unlock()
+		return
+	}
 	app.mutex.Unlock()
-	app.logger.Info("Server added", "Name", serverStruct.Name)
+	app.logger.Info("Server added", "Name", serverStruct.Name, "Kind", serverStruct.Kind, "Fallback", serverStruct.Fallback, "Address", serverStruct.Address)
 	w.WriteHeader(200)
 }
 
@@ -75,6 +83,7 @@ func (app *application) RemoveServerHandler(w http.ResponseWriter, r *http.Reque
 	}
 	app.servers = servers
 	app.mutex.Unlock()
+	app.UnregisterServer(serverStruct.Name)
 	app.logger.Info("Server removed", "Name", serverStruct.Name)
 	w.WriteHeader(200)
 }
@@ -83,7 +92,7 @@ func (app *application) ListServersHandler(w http.ResponseWriter, r *http.Reques
 	app.logger.Info("Server list request received")
 	app.mutex.Lock()
 	w.Header().Set("Content-Type", "application/json")
-	jsonData, err := json.Marshal(app.servers)
+	body, err := serverList(app.servers)
 	if err != nil {
 		w.WriteHeader(500)
 		app.mutex.Unlock()
@@ -91,9 +100,76 @@ func (app *application) ListServersHandler(w http.ResponseWriter, r *http.Reques
 	}
 	app.mutex.Unlock()
 	w.WriteHeader(200)
-	_, err = w.Write(jsonData)
+	_, err = w.Write(body.Bytes())
 	if err != nil {
 		app.logger.Error(err.Error())
 		return
+	}
+}
+
+func (app *application) RegisterServer(s data.Server) error {
+	body, err := serverList([]*data.Server{
+		&s,
+	})
+	if err != nil {
+		app.logger.Error(err.Error())
+		return err
+	}
+	app.logger.Info("Registering server", "Name", s.Name)
+
+	for _, p := range app.proxies {
+		url := "http://" + p.APIAddress.String() + "/servers/add"
+
+		req, err := http.NewRequest(http.MethodPost, url, body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", p.Secret)
+		if err != nil {
+			app.logger.Error(err.Error())
+			return err
+		}
+		res, err := app.client.Do(req)
+		if err != nil {
+			if res != nil && res.StatusCode != 200 {
+				app.logger.Error(res.Status)
+				return err
+			}
+			app.logger.Error(err.Error())
+			return err
+		}
+
+	}
+	return nil
+}
+
+func (app *application) UnregisterServer(name string) {
+	serverStruct := struct {
+		Name string `json:"name"`
+	}{
+		Name: name,
+	}
+	for _, p := range app.proxies {
+		url := "http://" + p.APIAddress.String() + "/servers/remove"
+
+		body, err := json.Marshal(serverStruct)
+		if err != nil {
+			app.logger.Error(err.Error())
+			return
+		}
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", p.Secret)
+		if err != nil {
+			app.logger.Error(err.Error())
+			return
+		}
+		res, err := app.client.Do(req)
+		if err != nil {
+			if res != nil && res.StatusCode != 200 {
+				app.logger.Error(res.Status)
+				return
+			}
+			app.logger.Error(err.Error())
+			return
+		}
 	}
 }

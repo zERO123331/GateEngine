@@ -32,7 +32,7 @@ type Server struct {
 	Name        string  `json:"name"`
 	Address     Address `json:"address"`
 	Fallback    bool    `json:"fallback"`
-	Kind        string  `json:",omitzero"`
+	Kind        string  `json:"kind"`
 	MaxPlayers  int     `json:",omitzero"`
 	PlayerCount int     `json:",omitzero"`
 }
