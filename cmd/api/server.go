@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -92,6 +93,9 @@ func (app *application) ListServersHandler(w http.ResponseWriter, r *http.Reques
 	app.logger.Info("Server list request received")
 	app.mutex.Lock()
 	w.Header().Set("Content-Type", "application/json")
+	sort.Slice(app.servers, func(i, j int) bool {
+		return app.servers[i].Name < app.servers[j].Name
+	})
 	body, err := serverList(app.servers)
 	if err != nil {
 		w.WriteHeader(500)
