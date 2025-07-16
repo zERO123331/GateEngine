@@ -20,6 +20,7 @@ type application struct {
 	mutex   sync.Mutex
 	proxies []*data.Proxy
 	servers []*data.Server
+	players []*data.Player
 	client  *http.Client
 }
 
